@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Wayfinder — neighborhood explorer</title>
+<!-- Leaflet CSS is loaded with CDN fallback in the script below -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0d1117; --ink-2:#141b24; --ink-3:#1c2530; --line:#2a3744;
+  --paper:#f5efe2; --muted:#8a9bab; --muted-2:#5f7488;
+  --amber:#f4a52b; --amber-soft:#f7c068; --teal:#34d6c2; --coral:#ff5d57;
+  --gold-glow:0 0 0 1px rgba(244,165,43,.35), 0 0 18px rgba(244,165,43,.25);
+  --r:14px; --r-sm:9px;
+  --shadow:0 10px 30px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden}
+body{
+  font-family:"Hanken Grotesk",system-ui,sans-serif;
+  background:var(--ink); color:var(--paper);
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input{font-family:inherit}
+
+/* ---------- layout ---------- */
+.app{display:flex;flex-direction:column;height:100%}
+.hud{
+  display:flex;align-items:center;gap:14px;
+  padding:10px 16px;background:linear-gradient(180deg,#10171f,#0d1117);
+  border-bottom:1px solid var(--line);z-index:600;flex:0 0 auto;
+}
+.brand{display:flex;align-items:center;gap:11px;margin-right:6px}
+.compass{
+  width:34px;height:34px;border-radius:50%;flex:0 0 auto;
+  background:radial-gradient(circle at 50% 35%,#1f2a36,#0d1117);
+  border:1px solid var(--line);display:grid;place-items:center;position:relative;
+  box-shadow:inset 0 0 12px rgba(0,0,0,.6);
+}
+.compass::before{content:"";position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(from 0deg,transparent 0 86%,rgba(244,165,43,.5) 90%,transparent 94%)}
+.compass span{font-size:15px;color:var(--amber);transform:rotate(-20deg);font-weight:700}
+.brand h1{
+  font-family:"Fraunces",serif;font-weight:600;font-size:20px;margin:0;letter-spacing:.3px;
+  line-height:1;
+}
+.brand small{display:block;font-family:"DM Mono",monospace;font-size:9.5px;letter-spacing:3px;
+  text-transform:uppercase;color:var(--muted-2);margin-top:3px}
+
+.stats{display:flex;gap:8px;margin-left:auto;align-items:stretch}
+.stat{
+  background:var(--ink-2);border:1px solid var(--line);border-radius:var(--r-sm);
+  padding:6px 11px;text-align:center;min-width:58px;
+}
+.stat b{display:block;font-family:"DM Mono",monospace;font-size:16px;line-height:1.1;color:var(--paper)}
+.stat .lab{font-size:8.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted-2);margin-top:2px}
+.stat.score b{color:var(--amber)}
+.stat.streak b{color:var(--coral)}
+.menu-btn{display:none}
+
+.main{flex:1;display:flex;min-height:0;position:relative}
+.deck{
+  width:362px;flex:0 0 362px;background:var(--ink);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;min-height:0;z-index:500;
+}
+.tabs{display:flex;border-bottom:1px solid var(--line);background:var(--ink-2)}
+.tabs button{
+  flex:1;padding:11px 4px 9px;font-size:11px;letter-spacing:.5px;color:var(--muted-2);
+  border-bottom:2px solid transparent;display:flex;flex-direction:column;align-items:center;gap:3px;
+  font-weight:600;transition:.15s;
+}
+.tabs button svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7}
+.tabs button.on{color:var(--amber);border-bottom-color:var(--amber)}
+.tabs button:hover{color:var(--paper)}
+.panels{flex:1;overflow-y:auto;overflow-x:hidden}
+.panel{display:none;padding:16px}
+.panel.on{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+h2.sec{font-family:"Fraunces",serif;font-weight:600;font-size:17px;margin:0 0 3px}
+.hint{font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 14px}
+.mini-label{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted-2);
+  font-weight:700;margin:18px 0 8px;display:flex;align-items:center;gap:8px}
+.mini-label::after{content:"";flex:1;height:1px;background:var(--line)}
+
+/* search */
+.search{position:relative;margin-bottom:6px}
+.search input{
+  width:100%;padding:11px 12px;background:var(--ink-2);border:1px solid var(--line);
+  border-radius:var(--r-sm);color:var(--paper);font-size:14px;outline:none;transition:.15s;
+}
+.search input:focus{border-color:var(--amber);box-shadow:0 0 0 3px rgba(244,165,43,.12)}
+.results{
+  position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--ink-3);
+  border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden;z-index:30;
+  box-shadow:var(--shadow);max-height:240px;overflow-y:auto;
+}
+.results div{padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--line);line-height:1.35}
+.results div:last-child{border-bottom:none}
+.results div:hover{background:var(--amber);color:var(--ink)}
+
+/* buttons */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:11px 14px;border-radius:var(--r-sm);font-weight:700;font-size:13.5px;
+  background:var(--ink-3);border:1px solid var(--line);color:var(--paper);transition:.15s;width:100%;
+}
+.btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8}
+.btn:hover{border-color:var(--muted-2)}
+.btn.primary{background:var(--amber);color:#231503;border-color:var(--amber);box-shadow:var(--gold-glow)}
+.btn.primary:hover{background:var(--amber-soft)}
+.btn.teal{background:var(--teal);color:#06302b;border-color:var(--teal)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--coral);border-color:rgba(255,93,87,.4)}
+.btn.danger:hover{background:rgba(255,93,87,.12)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.sm{padding:7px 10px;font-size:12px;width:auto}
+.row{display:flex;gap:8px}
+.row>*{flex:1}
+
+/* cards / lists */
+.card{
+  background:var(--ink-2);border:1px solid var(--line);border-radius:var(--r);
+  padding:13px;margin-bottom:10px;
+}
+.dest{display:flex;align-items:flex-start;gap:11px}
+.dest .pin{width:30px;height:30px;border-radius:8px;flex:0 0 auto;display:grid;place-items:center;
+  background:var(--ink-3);border:1px solid var(--line);font-size:15px}
+.dest .body{flex:1;min-width:0}
+.dest .body h3{margin:0;font-size:14.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dest .meta{font-size:11.5px;color:var(--muted);margin-top:3px;font-family:"DM Mono",monospace}
+.dest-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.tagbar{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.tag{font-size:10px;font-family:"DM Mono",monospace;background:var(--ink-3);border:1px solid var(--line);
+  padding:2px 7px;border-radius:20px;color:var(--muted)}
+.route-line{display:flex;align-items:center;gap:9px;padding:8px 0;border-top:1px dashed var(--line);font-size:12.5px}
+.route-line:first-of-type{border-top:none}
+.route-line .dot{width:9px;height:9px;border-radius:50%;background:var(--amber);flex:0 0 auto;box-shadow:0 0 8px var(--amber)}
+.route-line .rmeta{margin-left:auto;font-family:"DM Mono",monospace;font-size:11px;color:var(--muted);text-align:right}
+.empty{text-align:center;padding:34px 14px;color:var(--muted-2)}
+.empty svg{width:40px;height:40px;stroke:var(--line);fill:none;stroke-width:1.4;margin-bottom:10px}
+.empty p{font-size:13px;line-height:1.5;margin:0}
+
+/* map */
+.map-wrap{flex:1;position:relative;min-width:0}
+#map{position:absolute;inset:0;background:#0d1117}
+.leaflet-container{font-family:"Hanken Grotesk",sans-serif;background:#dfe6e9}
+.map-tools{position:absolute;top:12px;right:12px;z-index:450;display:flex;flex-direction:column;gap:8px}
+.map-tools button{
+  width:42px;height:42px;border-radius:11px;background:rgba(13,17,23,.88);
+  border:1px solid var(--line);display:grid;place-items:center;backdrop-filter:blur(8px);color:var(--paper);
+  box-shadow:var(--shadow);
+}
+.map-tools button svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.7}
+.map-tools button:hover{border-color:var(--amber);color:var(--amber)}
+.tile-pop{position:absolute;top:0;right:52px;background:rgba(13,17,23,.94);border:1px solid var(--line);
+  border-radius:11px;padding:6px;display:none;flex-direction:column;gap:3px;backdrop-filter:blur(8px);box-shadow:var(--shadow)}
+.tile-pop.on{display:flex}
+.tile-pop button{width:auto;height:auto;padding:8px 14px;font-size:12px;justify-content:flex-start;border:none;border-radius:7px;background:transparent}
+.tile-pop button.on{background:var(--amber);color:var(--ink);font-weight:700}
+
+.record-bar{
+  position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:460;
+  background:rgba(13,17,23,.94);border:1px solid var(--amber);border-radius:16px;
+  padding:12px 16px;display:none;align-items:center;gap:14px;backdrop-filter:blur(10px);
+  box-shadow:var(--gold-glow),var(--shadow);max-width:calc(100% - 24px);
+}
+.record-bar.on{display:flex}
+.record-bar .rb-info{font-size:12px;line-height:1.4}
+.record-bar .rb-info b{font-family:"DM Mono",monospace;font-size:15px;color:var(--amber);display:block}
+.record-bar .rb-info span{color:var(--muted)}
+.pulse{width:10px;height:10px;border-radius:50%;background:var(--coral);animation:pulse 1.1s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,93,87,.6)}50%{box-shadow:0 0 0 7px rgba(255,93,87,0)}}
+
+/* timer / time trial */
+.tt-clock{font-family:"DM Mono",monospace;font-size:40px;text-align:center;letter-spacing:1px;
+  color:var(--amber);margin:6px 0 14px;font-weight:500}
+.tt-route{display:flex;align-items:center;gap:10px;padding:11px;border:1px solid var(--line);
+  border-radius:var(--r-sm);margin-bottom:8px;cursor:pointer;transition:.15s;background:var(--ink-2)}
+.tt-route:hover{border-color:var(--muted-2)}
+.tt-route.sel{border-color:var(--amber);box-shadow:var(--gold-glow)}
+.tt-route .body{flex:1;min-width:0}
+.tt-route h4{margin:0;font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tt-route .best{font-family:"DM Mono",monospace;font-size:11px;color:var(--teal);margin-top:2px}
+.tt-route .best.none{color:var(--muted-2)}
+
+/* quiz */
+.quiz-stage{text-align:center}
+.quiz-img{width:100%;height:200px;border-radius:var(--r);object-fit:cover;background:var(--ink-3);
+  border:1px solid var(--line);margin-bottom:14px;display:block}
+.quiz-imgph{width:100%;height:150px;border-radius:var(--r);background:var(--ink-3);border:1px solid var(--line);
+  display:grid;place-items:center;color:var(--muted-2);margin-bottom:14px;text-align:center;padding:16px;font-size:12.5px;line-height:1.5}
+.quiz-q{font-size:14px;color:var(--muted);margin-bottom:14px}
+.quiz-q b{color:var(--paper);font-weight:700}
+.quiz-opts{display:grid;gap:8px}
+.quiz-opt{padding:13px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:14px;font-weight:600;
+  background:var(--ink-2);text-align:left;transition:.12s;width:100%}
+.quiz-opt:hover{border-color:var(--muted-2)}
+.quiz-opt.correct{background:rgba(52,214,194,.18);border-color:var(--teal);color:var(--teal)}
+.quiz-opt.wrong{background:rgba(255,93,87,.15);border-color:var(--coral);color:var(--coral)}
+.quiz-progress{display:flex;justify-content:space-between;font-family:"DM Mono",monospace;font-size:11px;
+  color:var(--muted-2);margin-bottom:14px;letter-spacing:.5px}
+
+/* stats */
+.bigstat{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px}
+.bigstat .card{margin:0;text-align:center;padding:15px 10px}
+.bigstat b{font-family:"DM Mono",monospace;font-size:25px;display:block;color:var(--amber)}
+.bigstat .lab{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted-2);margin-top:4px}
+.bar{margin:9px 0}
+.bar .bl{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px}
+.bar .bl span:last-child{font-family:"DM Mono",monospace;color:var(--muted)}
+.bar .track{height:8px;background:var(--ink-3);border-radius:6px;overflow:hidden}
+.bar .fill{height:100%;background:linear-gradient(90deg,var(--amber),var(--amber-soft));border-radius:6px;transition:width .6s}
+.bar .fill.teal{background:linear-gradient(90deg,var(--teal),#7af0e2)}
+
+/* setup */
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;font-weight:600;margin-bottom:6px}
+.field .sub{font-size:11px;color:var(--muted);font-weight:400;margin-bottom:7px;line-height:1.5}
+.field input{width:100%;padding:10px 12px;background:var(--ink-2);border:1px solid var(--line);
+  border-radius:var(--r-sm);color:var(--paper);font-size:13px;outline:none;font-family:"DM Mono",monospace}
+.field input:focus{border-color:var(--amber)}
+.field a{color:var(--amber);text-decoration:none}
+.field a:hover{text-decoration:underline}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--muted-2)}
+.status-dot.ok{background:var(--teal);box-shadow:0 0 7px var(--teal)}
+
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(5,8,11,.7);z-index:900;display:none;
+  align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(3px)}
+.modal-bg.on{display:flex;animation:fade .2s}
+.modal{background:var(--ink-2);border:1px solid var(--line);border-radius:var(--r);padding:20px;
+  width:100%;max-width:380px;box-shadow:var(--shadow)}
+.modal h3{font-family:"Fraunces",serif;font-size:18px;margin:0 0 4px}
+.modal p{font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.5}
+.modal input{width:100%;padding:11px;background:var(--ink-3);border:1px solid var(--line);border-radius:var(--r-sm);
+  color:var(--paper);font-size:14px;outline:none;margin-bottom:14px}
+.modal input:focus{border-color:var(--amber)}
+
+/* toast */
+.toasts{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:950;display:flex;
+  flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.toast{background:var(--ink-3);border:1px solid var(--line);border-left:3px solid var(--amber);
+  padding:11px 16px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:var(--shadow);
+  animation:toastin .3s ease;max-width:320px}
+.toast.teal{border-left-color:var(--teal)}
+.toast.coral{border-left-color:var(--coral)}
+.toast .sub{display:block;font-weight:400;color:var(--muted);font-size:11.5px;margin-top:2px}
+@keyframes toastin{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* you-are-here */
+.me-dot{width:16px;height:16px;border-radius:50%;background:#2e9bff;border:3px solid #fff;
+  box-shadow:0 0 0 2px #2e9bff,0 0 12px rgba(46,155,255,.85);position:relative}
+.me-dot::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid #2e9bff;
+  animation:mepulse 1.7s infinite}
+@keyframes mepulse{0%{transform:scale(1);opacity:.8}100%{transform:scale(2.8);opacity:0}}
+.near-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--line);
+  border-radius:9px;margin-bottom:7px;background:var(--ink-2);cursor:pointer;transition:.12s}
+.near-row:hover{border-color:var(--amber)}
+.near-row .ni{width:28px;height:28px;border-radius:7px;background:var(--ink-3);display:grid;
+  place-items:center;font-size:14px;flex:0 0 auto}
+.near-row .nb{flex:1;min-width:0}
+.near-row h4{margin:0;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.near-row .nm{font-size:11px;color:var(--muted);font-family:"DM Mono",monospace}
+.near-row .nadd{font-size:18px;color:var(--amber);flex:0 0 auto;padding:0 4px}
+
+/* leaflet marker tweaks */
+.lm-pin{display:grid;place-items:center;font-size:18px;filter:drop-shadow(0 3px 4px rgba(0,0,0,.5))}
+.lm-home{font-size:22px}
+
+/* mobile */
+@media (max-width:860px){
+  .menu-btn{display:grid;place-items:center;width:38px;height:38px;border:1px solid var(--line);
+    border-radius:9px;background:var(--ink-2)}
+  .menu-btn svg{width:20px;height:20px;stroke:var(--paper);fill:none;stroke-width:2}
+  .brand small{display:none}
+  .stats .stat{min-width:46px;padding:5px 8px}
+  .stat b{font-size:14px}
+  .deck{position:absolute;inset:0;top:0;transform:translateX(-100%);transition:transform .28s ease;
+    width:100%;flex:none;border-right:none}
+  .deck.open{transform:none;box-shadow:var(--shadow)}
+  .main{position:relative}
+}
+@media (max-width:420px){
+  .stats .stat:nth-child(4){display:none}
+  .brand h1{font-size:17px}
+}
+.leaflet-routing-marker{}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="hud">
+    <button class="menu-btn" id="menuBtn" aria-label="Menu">
+      <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <div class="brand">
+      <div class="compass"><span>◤</span></div>
+      <div><h1>Wayfinder</h1><small>field explorer</small></div>
+    </div>
+    <div class="stats">
+      <div class="stat score"><b id="sScore">0</b><div class="lab">points</div></div>
+      <div class="stat"><b id="sLevel">1</b><div class="lab">level</div></div>
+      <div class="stat streak"><b id="sStreak">0</b><div class="lab">streak</div></div>
+      <div class="stat"><b id="sRoutes">0</b><div class="lab">routes</div></div>
+    </div>
+  </header>
+
+  <div class="main">
+    <aside class="deck" id="deck">
+      <nav class="tabs">
+        <button data-tab="explore" class="on"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.2-7-11a7 7 0 1 1 14 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Explore</button>
+        <button data-tab="travel"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Travel</button>
+        <button data-tab="learn"><svg viewBox="0 0 24 24"><path d="M4 5h11a3 3 0 0 1 3 3v11"/><path d="M4 5v11a3 3 0 0 0 3 3h11"/><path d="M9 9h5M9 12h5"/></svg>Learn</button>
+        <button data-tab="stats"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Stats</button>
+        <button data-tab="setup"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.4 1a7 7 0 0 0-1.7-1l-.3-2.5h-4l-.3 2.5a7 7 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7 7 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7 7 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6c.1-.3.1-.6.1-1z"/></svg>Setup</button>
+      </nav>
+      <div class="panels">
+
+        <!-- EXPLORE -->
+        <section class="panel on" id="p-explore">
+          <h2 class="sec">Your map</h2>
+          <p class="hint">Set your home base, then add places you want to learn to reach. Record every different way you find to get there.</p>
+          <div class="search">
+            <input id="searchInput" placeholder="Search an address or place…" autocomplete="off">
+            <div class="results" id="searchResults" style="display:none"></div>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button class="btn sm primary" id="setHomeBtn" style="flex:1"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Set as home</button>
+            <button class="btn sm" id="addDestBtn" style="flex:1"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add place</button>
+          </div>
+          <p class="hint" style="margin-top:8px">Tip: you can also long-press / right-click the map to drop a place there.</p>
+
+          <div class="mini-label">Near me</div>
+          <div class="row">
+            <button class="btn sm" id="locateBtn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>Locate me</button>
+            <button class="btn sm" id="nearBtn"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.2-7-11a7 7 0 1 1 14 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Places nearby</button>
+          </div>
+          <div id="myPosCard"></div>
+          <div id="nearList"></div>
+
+          <div class="mini-label">Home base</div>
+          <div id="homeCard"></div>
+
+          <div class="mini-label">Places to reach</div>
+          <div id="destList"></div>
+        </section>
+
+        <!-- TRAVEL -->
+        <section class="panel" id="p-travel">
+          <h2 class="sec">Time trials</h2>
+          <p class="hint">Pick a route you've recorded, hit start when you set off, stop when you arrive. Beat your best time for bonus points.</p>
+          <div class="tt-clock" id="ttClock">00:00.0</div>
+          <div class="row">
+            <button class="btn primary" id="ttStart"><svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg>Start</button>
+            <button class="btn danger" id="ttStop" disabled><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>Stop</button>
+          </div>
+          <div class="mini-label">Choose a route</div>
+          <div id="ttRoutes"></div>
+        </section>
+
+        <!-- LEARN -->
+        <section class="panel" id="p-learn">
+          <h2 class="sec">Memory drills</h2>
+          <p class="hint">Quiz yourself on the streets and landmarks you've collected. Misses come back more often.</p>
+          <div class="row" style="margin-bottom:10px">
+            <button class="btn primary" id="quizStart"><svg viewBox="0 0 24 24"><path d="M9 9a3 3 0 1 1 4 2.8c-.8.4-1 1-1 2"/><circle cx="12" cy="17" r=".6"/></svg>Start drill</button>
+          </div>
+          <div id="quizArea"></div>
+          <div class="mini-label">Add a landmark</div>
+          <p class="hint" style="margin-top:-4px">Tap a memorable spot on the map (a sign, shop, statue) to pin it. With a Mapillary token, Wayfinder grabs a street photo for your quiz.</p>
+          <button class="btn" id="addLmBtn"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.2-7-11a7 7 0 1 1 14 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Pin a landmark</button>
+          <div id="lmList" style="margin-top:12px"></div>
+        </section>
+
+        <!-- STATS -->
+        <section class="panel" id="p-stats">
+          <h2 class="sec">Your progress</h2>
+          <p class="hint">How well you're learning the neighborhood.</p>
+          <div class="bigstat">
+            <div class="card"><b id="stRoutes">0</b><div class="lab">routes found</div></div>
+            <div class="card"><b id="stStreets">0</b><div class="lab">streets known</div></div>
+            <div class="card"><b id="stKm">0</b><div class="lab">km mapped</div></div>
+            <div class="card"><b id="stAcc">—</b><div class="lab">quiz accuracy</div></div>
+          </div>
+          <div class="mini-label">Coverage by destination</div>
+          <div id="coverList"></div>
+          <div class="mini-label">Toughest streets</div>
+          <div id="weakList"></div>
+        </section>
+
+        <!-- SETUP -->
+        <section class="panel" id="p-setup">
+          <h2 class="sec">Setup</h2>
+          <p class="hint">Everything saves to this browser only. Keep this file somewhere safe.</p>
+          <div class="field">
+            <label><span class="status-dot" id="mlyDot"></span>Mapillary access token</label>
+            <div class="sub">Free street-level photos for your landmark & street quizzes. Sign up at <a href="https://www.mapillary.com/dashboard/developers" target="_blank" rel="noopener">mapillary.com developers</a>, create a token, paste it here (starts with <b>MLY|</b>).</div>
+            <input id="mlyToken" placeholder="MLY|XXXX|XXXX" spellcheck="false">
+          </div>
+          <button class="btn primary" id="saveTokenBtn"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-9"/></svg>Save token</button>
+
+          <div class="mini-label">Routing</div>
+          <p class="hint" style="margin-top:-4px">When on, drawn waypoints snap to real roads and Wayfinder records the street names you pass (needs internet). Turn off to draw straight lines offline.</p>
+          <button class="btn" id="routingToggle">Road-snapping: <b style="margin-left:5px" id="routingState">On</b></button>
+
+          <div class="mini-label">Data</div>
+          <div class="row">
+            <button class="btn ghost" id="exportBtn"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export</button>
+            <button class="btn ghost" id="importBtn"><svg viewBox="0 0 24 24"><path d="M12 21V9M7 14l5-5 5 5M5 3h14"/></svg>Import</button>
+          </div>
+          <button class="btn danger" id="resetBtn" style="margin-top:8px"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>Reset everything</button>
+          <input type="file" id="importFile" accept="application/json" style="display:none">
+        </section>
+      </div>
+    </aside>
+
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="map-tools">
+        <button id="gpsBtn" title="Locate me"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg></button>
+        <button id="recenterBtn" title="Recenter on home"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg></button>
+        <div style="position:relative">
+          <button id="tileBtn" title="Map style"><svg viewBox="0 0 24 24"><path d="M12 2l9 5-9 5-9-5z"/><path d="M3 12l9 5 9-5M3 17l9 5 9-5"/></svg></button>
+          <div class="tile-pop" id="tilePop"></div>
+        </div>
+      </div>
+      <div class="record-bar" id="recordBar">
+        <div class="pulse"></div>
+        <div class="rb-info"><b id="rbDist">0.0 km</b><span id="rbStreets">0 streets · tap map to add waypoints</span></div>
+        <button class="btn sm" id="rbUndo" style="border-color:var(--line)">Undo</button>
+        <button class="btn sm primary" id="rbSave">Save route</button>
+        <button class="btn sm danger" id="rbCancel">✕</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="modalTitle">Name it</h3>
+    <p id="modalText"></p>
+    <input id="modalInput" placeholder="Type a name…">
+    <div class="row">
+      <button class="btn ghost" id="modalCancel">Cancel</button>
+      <button class="btn primary" id="modalOk">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+/* ---------- resilient Leaflet loader (tries multiple CDNs) ---------- */
+(function(){
+  var CSS=[
+    "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css",
+    "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
+  ];
+  var JS=[
+    "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js",
+    "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"
+  ];
+  (function css(i){ if(i>=CSS.length)return; var l=document.createElement("link");
+    l.rel="stylesheet"; l.href=CSS[i]; l.onerror=function(){css(i+1);}; document.head.appendChild(l); })(0);
+  function tryJS(i){
+    if(window.L){ startApp(); return; }
+    if(i>=JS.length){ fail(); return; }
+    var s=document.createElement("script"); s.src=JS[i];
+    s.onload=function(){ window.L ? startApp() : tryJS(i+1); };
+    s.onerror=function(){ tryJS(i+1); };
+    document.head.appendChild(s);
+  }
+  function fail(){ var m=document.getElementById("map"); if(!m)return; m.innerHTML=
+    '<div style="position:absolute;inset:0;display:grid;place-items:center;padding:30px;text-align:center;color:#8a9bab;font-family:sans-serif">'+
+    '<div><div style="font-size:34px;margin-bottom:10px">\uD83D\uDDFA\uFE0F</div>'+
+    '<b style="color:#f5efe2;font-size:16px">Map library couldn\u2019t load</b>'+
+    '<p style="font-size:13px;line-height:1.6;max-width:300px;margin:10px auto 0">Wayfinder needs internet to load the map the first time. Make sure you\u2019re online and have <b>downloaded this file and opened it in a normal browser tab</b> (not inside a chat preview or sandbox), then refresh.</p></div></div>'; }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",function(){tryJS(0);});
+  else tryJS(0);
+})();
+
+function startApp(){
+"use strict";
+if(window.__wfStarted)return; window.__wfStarted=true;
+/* ============================================================
+   Wayfinder — single-file neighborhood explorer game
+   ============================================================ */
+
+/* ---------- safe storage ---------- */
+const KEY="wayfinder.v1";
+const mem={};
+const store={
+  get(k){ try{return localStorage.getItem(k);}catch(e){return mem[k]??null;} },
+  set(k,v){ try{localStorage.setItem(k,v);}catch(e){mem[k]=v;} }
+};
+
+/* ---------- state ---------- */
+const blank={
+  home:null,                // {lat,lng,name}
+  dests:[],                 // {id,name,lat,lng,routes:[{id,name,coords,streets:[{name,lat,lng}],dist,bestMs}]}
+  landmarks:[],             // {id,name,lat,lng,photo}
+  quizItems:{},             // key -> {seen,correct}  (street:NAME / lm:ID)
+  score:0, streak:0, lastTravel:null,
+  settings:{ token:"", routing:true, tile:"voyager" }
+};
+let S=load();
+function load(){
+  try{ const raw=store.get(KEY); if(raw){ const d=JSON.parse(raw); return Object.assign(JSON.parse(JSON.stringify(blank)),d,{settings:Object.assign({},blank.settings,d.settings||{})}); } }catch(e){}
+  return JSON.parse(JSON.stringify(blank));
+}
+let saveT;
+function save(){ clearTimeout(saveT); saveT=setTimeout(()=>store.set(KEY,JSON.stringify(S)),250); }
+const uid=()=>Math.random().toString(36).slice(2,9);
+
+/* ---------- map ---------- */
+const TILES={
+  voyager:{name:"Voyager",url:"https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",attr:'&copy; OpenStreetMap, &copy; CARTO'},
+  positron:{name:"Light",url:"https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",attr:'&copy; OpenStreetMap, &copy; CARTO'},
+  dark:{name:"Dark",url:"https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",attr:'&copy; OpenStreetMap, &copy; CARTO'},
+  osm:{name:"Standard",url:"https://tile.openstreetmap.org/{z}/{x}/{y}.png",attr:'&copy; OpenStreetMap'}
+};
+const map=L.map("map",{zoomControl:false,attributionControl:true}).setView([40.7128,-74.006],13);
+L.control.zoom({position:"bottomright"}).addTo(map);
+let tileLayer=null;
+function setTile(k){
+  S.settings.tile=k; save();
+  if(tileLayer) map.removeLayer(tileLayer);
+  tileLayer=L.tileLayer(TILES[k].url,{attribution:TILES[k].attr,maxZoom:20,detectRetina:true}).addTo(map);
+  document.querySelectorAll("#tilePop button").forEach(b=>b.classList.toggle("on",b.dataset.t===k));
+}
+const layers={home:null,dests:L.layerGroup().addTo(map),routes:L.layerGroup().addTo(map),lm:L.layerGroup().addTo(map),draw:L.layerGroup().addTo(map),flash:L.layerGroup().addTo(map),me:L.layerGroup().addTo(map)};
+let myPos=null, watchId=null;
+const meIcon=L.divIcon({className:"",html:'<div class="me-dot"></div>',iconSize:[16,16],iconAnchor:[8,8]});
+
+function mIcon(emoji,cls=""){ return L.divIcon({className:"",html:`<div class="lm-pin ${cls}">${emoji}</div>`,iconSize:[30,30],iconAnchor:[15,28]}); }
+
+/* ---------- el helpers ---------- */
+const $=s=>document.querySelector(s);
+const $$=s=>document.querySelectorAll(s);
+function toast(msg,sub="",type=""){ const t=document.createElement("div"); t.className="toast "+type;
+  t.innerHTML=msg+(sub?`<span class="sub">${sub}</span>`:""); $("#toasts").appendChild(t);
+  setTimeout(()=>{t.style.transition="opacity .3s";t.style.opacity="0";setTimeout(()=>t.remove(),300);},2600); }
+
+/* ---------- modal prompt ---------- */
+let modalCb=null;
+function prompt2(title,text,val,cb){ $("#modalTitle").textContent=title; $("#modalText").textContent=text;
+  const i=$("#modalInput"); i.value=val||""; modalCb=cb; $("#modalBg").classList.add("on"); setTimeout(()=>i.focus(),50); }
+$("#modalCancel").onclick=()=>{ $("#modalBg").classList.remove("on"); modalCb=null; };
+$("#modalOk").onclick=()=>{ const v=$("#modalInput").value.trim(); if(modalCb)modalCb(v); $("#modalBg").classList.remove("on"); modalCb=null; };
+$("#modalInput").addEventListener("keydown",e=>{ if(e.key==="Enter")$("#modalOk").click(); });
+
+/* ---------- geocode search (Nominatim) ---------- */
+let searchT;
+$("#searchInput").addEventListener("input",e=>{
+  const q=e.target.value.trim(); clearTimeout(searchT);
+  if(q.length<3){ $("#searchResults").style.display="none"; return; }
+  searchT=setTimeout(()=>doSearch(q),350);
+});
+async function doSearch(q){
+  try{
+    let url=`https://nominatim.openstreetmap.org/search?format=json&limit=6&q=${encodeURIComponent(q)}`;
+    const c=map.getCenter(); url+=`&viewbox=${c.lng-.15},${c.lat+.15},${c.lng+.15},${c.lat-.15}`;
+    const r=await fetch(url,{headers:{"Accept-Language":"en"}}); const data=await r.json();
+    const box=$("#searchResults");
+    if(!data.length){ box.innerHTML="<div>No matches found</div>"; box.style.display="block"; return; }
+    box.innerHTML=""; data.forEach(d=>{ const el=document.createElement("div");
+      el.textContent=d.display_name; el.onclick=()=>{ pickSearch(parseFloat(d.lat),parseFloat(d.lon),d.display_name.split(",")[0]); };
+      box.appendChild(el); });
+    box.style.display="block";
+  }catch(e){ toast("Search failed","Check your connection","coral"); }
+}
+let lastPick=null;
+function pickSearch(lat,lng,name){
+  lastPick={lat,lng,name}; $("#searchResults").style.display="none"; $("#searchInput").value=name;
+  map.flyTo([lat,lng],16); layers.flash.clearLayers();
+  L.marker([lat,lng],{icon:mIcon("📍")}).addTo(layers.flash);
+}
+document.addEventListener("click",e=>{ if(!e.target.closest(".search")) $("#searchResults").style.display="none"; });
+
+$("#setHomeBtn").onclick=()=>{ if(!lastPick)return toast("Search for a place first"); setHome(lastPick.lat,lastPick.lng,lastPick.name); };
+$("#addDestBtn").onclick=()=>{ if(!lastPick)return toast("Search for a place first");
+  prompt2("Name this place","What do you want to call it?",lastPick.name,n=>{ if(n)addDest(lastPick.lat,lastPick.lng,n); }); };
+
+/* ---------- home & destinations ---------- */
+function setHome(lat,lng,name){ S.home={lat,lng,name:name||"Home"}; save(); renderHome(); drawAll();
+  layers.flash.clearLayers(); map.flyTo([lat,lng],15); toast("Home base set 🏠",name||"","teal"); }
+function addDest(lat,lng,name){ S.dests.push({id:uid(),name,lat,lng,routes:[]}); save(); renderDests(); drawAll();
+  layers.flash.clearLayers(); toast("Place added","Now record a route to it","teal"); switchTab("explore"); }
+function delDest(id){ S.dests=S.dests.filter(d=>d.id!==id); save(); renderDests(); drawAll(); updateHUD(); renderStats(); }
+
+function renderHome(){
+  const c=$("#homeCard");
+  if(!S.home){ c.innerHTML=`<div class="empty"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><p>No home yet. Search a spot and tap "Set as home".</p></div>`; return; }
+  c.innerHTML=`<div class="card"><div class="dest"><div class="pin">🏠</div><div class="body"><h3>${esc(S.home.name)}</h3><div class="meta">${S.home.lat.toFixed(4)}, ${S.home.lng.toFixed(4)}</div></div></div></div>`;
+}
+function renderDests(){
+  const c=$("#destList");
+  if(!S.dests.length){ c.innerHTML=`<div class="empty"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.2-7-11a7 7 0 1 1 14 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><p>No places yet. Add somewhere you want to learn the way to.</p></div>`; return; }
+  c.innerHTML="";
+  S.dests.forEach((d,i)=>{
+    const el=document.createElement("div"); el.className="card";
+    const streetSet=new Set(); d.routes.forEach(r=>r.streets.forEach(s=>streetSet.add(s.name)));
+    let routesHtml=d.routes.map(r=>`<div class="route-line"><div class="dot"></div><div>${esc(r.name)}</div><div class="rmeta">${(r.dist/1000).toFixed(2)} km<br>${r.streets.length} streets</div></div>`).join("");
+    el.innerHTML=`<div class="dest"><div class="pin">${pinFor(i)}</div><div class="body"><h3>${esc(d.name)}</h3>
+      <div class="meta">${d.routes.length} route${d.routes.length!==1?"s":""} · ${streetSet.size} unique streets</div></div></div>
+      ${routesHtml||'<p class="hint" style="margin:8px 0 0">No routes recorded yet.</p>'}
+      <div class="dest-actions">
+        <button class="btn sm primary" data-rec="${d.id}"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Record route</button>
+        <button class="btn sm ghost" data-go="${d.id}">Show</button>
+        <button class="btn sm danger" data-del="${d.id}">Delete</button>
+      </div>`;
+    c.appendChild(el);
+  });
+  c.querySelectorAll("[data-rec]").forEach(b=>b.onclick=()=>startRecord(b.dataset.rec));
+  c.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{ const d=S.dests.find(x=>x.id===b.dataset.go); map.flyTo([d.lat,d.lng],15); closeDeck(); });
+  c.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{ const d=S.dests.find(x=>x.id===b.dataset.del); prompt2("Delete place","Type DELETE to remove "+d.name+" and its routes.","",v=>{ if(v==="DELETE")delDest(b.dataset.del); }); });
+}
+const PINS=["🟠","🔵","🟣","🟢","🔴","🟡","🟤","⚫"];
+const pinFor=i=>PINS[i%PINS.length];
+const esc=s=>String(s).replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+
+/* ---------- draw everything on map ---------- */
+function drawAll(){
+  layers.dests.clearLayers(); layers.routes.clearLayers(); layers.lm.clearLayers();
+  if(layers.home){ map.removeLayer(layers.home); layers.home=null; }
+  if(S.home){ layers.home=L.marker([S.home.lat,S.home.lng],{icon:mIcon("🏠","lm-home")}).addTo(map).bindTooltip(S.home.name); }
+  S.dests.forEach((d,i)=>{
+    L.marker([d.lat,d.lng],{icon:mIcon(pinFor(i))}).addTo(layers.dests).bindTooltip(d.name);
+    d.routes.forEach(r=>{
+      L.polyline(r.coords.map(c=>[c[0],c[1]]),{color:"#f4a52b",weight:4,opacity:.55}).addTo(layers.routes);
+    });
+  });
+  S.landmarks.forEach(l=>{ L.marker([l.lat,l.lng],{icon:mIcon("⭐")}).addTo(layers.lm).bindTooltip(l.name); });
+}
+
+/* ---------- routing (OSRM) ---------- */
+async function osrmRoute(a,b){
+  const url=`https://router.project-osrm.org/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?overview=full&geometries=geojson&steps=true`;
+  const r=await fetch(url); const data=await r.json();
+  if(!data.routes||!data.routes.length) throw new Error("no route");
+  const route=data.routes[0];
+  const coords=route.geometry.coordinates.map(c=>[c[1],c[0]]);
+  const streets=[];
+  (route.legs||[]).forEach(leg=>(leg.steps||[]).forEach(st=>{
+    const nm=(st.name||"").trim();
+    if(nm && nm.length>2 && !/^\d+$/.test(nm)) streets.push({name:nm,lat:st.maneuver.location[1],lng:st.maneuver.location[0]});
+  }));
+  return {coords,streets,dist:route.distance};
+}
+
+/* ---------- record route ---------- */
+let recording=null; // {destId, points:[[lat,lng]], legs:[{coords,streets,dist}], line, markers:[]}
+function startRecord(destId){
+  const d=S.dests.find(x=>x.id===destId); if(!d)return;
+  recording={destId,points:[],legs:[],line:null,markers:[]};
+  layers.draw.clearLayers(); $("#recordBar").classList.add("on");
+  $("#rbDist").textContent="0.0 km"; $("#rbStreets").textContent="0 streets · tap map to add waypoints";
+  closeDeck();
+  if(S.home){ recording.points.push([S.home.lat,S.home.lng]); addRecMarker([S.home.lat,S.home.lng],"🏁"); map.setView([S.home.lat,S.home.lng],15); }
+  toast("Recording route","Tap the map along the way you take");
+}
+function addRecMarker(ll,emoji="•"){
+  const m=L.marker(ll,{icon:mIcon(emoji)}).addTo(layers.draw); recording.markers.push(m);
+}
+async function recAddPoint(lat,lng){
+  if(!recording)return;
+  const prev=recording.points[recording.points.length-1];
+  recording.points.push([lat,lng]); addRecMarker([lat,lng]);
+  if(prev){
+    if(S.settings.routing){
+      try{ const leg=await osrmRoute(prev,[lat,lng]); recording.legs.push(leg); }
+      catch(e){ recording.legs.push({coords:[prev,[lat,lng]],streets:[],dist:haversine(prev,[lat,lng])}); toast("Couldn't snap to roads","Drew a straight line","coral"); }
+    } else {
+      recording.legs.push({coords:[prev,[lat,lng]],streets:[],dist:haversine(prev,[lat,lng])});
+    }
+  }
+  redrawRec();
+}
+function redrawRec(){
+  if(recording.line) layers.draw.removeLayer(recording.line);
+  const coords=recCoords();
+  recording.line=L.polyline(coords,{color:"#f4a52b",weight:5,opacity:.95}).addTo(layers.draw);
+  const dist=recording.legs.reduce((s,l)=>s+l.dist,0);
+  const streets=recStreets();
+  $("#rbDist").textContent=(dist/1000).toFixed(2)+" km";
+  $("#rbStreets").textContent=`${streets.length} streets · ${recording.points.length} stops`;
+}
+function recCoords(){ let c=[]; if(!recording.legs.length && recording.points.length) return recording.points.slice();
+  recording.legs.forEach((l,i)=>{ if(i===0)c=c.concat(l.coords); else c=c.concat(l.coords.slice(1)); }); return c; }
+function recStreets(){ const seen=new Set(),out=[]; recording.legs.forEach(l=>l.streets.forEach(s=>{ if(!seen.has(s.name)){seen.add(s.name);out.push(s);} })); return out; }
+function haversine(a,b){ const R=6371000,toR=x=>x*Math.PI/180;
+  const dLat=toR(b[0]-a[0]),dLng=toR(b[1]-a[1]);
+  const x=Math.sin(dLat/2)**2+Math.cos(toR(a[0]))*Math.cos(toR(b[0]))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(x)); }
+
+$("#rbUndo").onclick=()=>{ if(!recording||recording.points.length<=1)return;
+  recording.points.pop(); recording.legs.pop(); const m=recording.markers.pop(); if(m)layers.draw.removeLayer(m); redrawRec(); };
+$("#rbCancel").onclick=cancelRecord;
+function cancelRecord(){ recording=null; layers.draw.clearLayers(); $("#recordBar").classList.remove("on"); }
+$("#rbSave").onclick=()=>{
+  if(!recording||recording.points.length<2)return toast("Add at least one stop along the way","coral");
+  const d=S.dests.find(x=>x.id===recording.destId); if(!d)return cancelRecord();
+  const coords=recCoords(), streets=recStreets(), dist=recording.legs.reduce((s,l)=>s+l.dist,0);
+  finalizeRoute(d,coords,streets,dist);
+};
+function finalizeRoute(d,coords,streets,dist){
+  // distinctness vs existing routes (Jaccard on street names)
+  const setNew=new Set(streets.map(s=>s.name.toLowerCase()));
+  let bestSim=0;
+  d.routes.forEach(r=>{ const setOld=new Set(r.streets.map(s=>s.name.toLowerCase()));
+    const inter=[...setNew].filter(x=>setOld.has(x)).length;
+    const uni=new Set([...setNew,...setOld]).size||1; bestSim=Math.max(bestSim,inter/uni); });
+  const distinct=1-bestSim;
+  // count brand-new streets for this destination
+  const known=new Set(); d.routes.forEach(r=>r.streets.forEach(s=>known.add(s.name.toLowerCase())));
+  const fresh=[...setNew].filter(x=>!known.has(x)).length;
+
+  const name="Route "+(d.routes.length+1);
+  const route={id:uid(),name,coords,streets,dist,bestMs:null};
+  d.routes.push(route);
+  // register quiz items for streets
+  streets.forEach(s=>{ const k="street:"+s.name; if(!S.quizItems[k])S.quizItems[k]={seen:0,correct:0,lat:s.lat,lng:s.lng}; });
+  // scoring
+  let pts=20; // base for any saved route
+  pts+=fresh*12;                         // new streets learned
+  pts+=Math.round(distinct*40);          // reward variety
+  if(d.routes.length===1)pts+=30;        // first route to a place
+  if(distinct<0.25 && d.routes.length>1){ pts=Math.max(8,Math.round(pts*0.4)); }  // similar route penalty
+  award(pts, distinct<0.25&&d.routes.length>1 ? "Similar to a route you had" : `${fresh} new streets · ${Math.round(distinct*100)}% distinct`);
+  cancelRecord(); save(); renderDests(); renderTT(); drawAll(); renderStats();
+}
+
+/* ---------- scoring / HUD ---------- */
+function award(pts,reason){ S.score+=pts; save(); updateHUD();
+  toast(`+${pts} points`,reason,"teal"); }
+function levelFor(score){ return Math.floor(score/250)+1; }
+function updateHUD(){
+  const lvl=levelFor(S.score);
+  $("#sScore").textContent=S.score; $("#sLevel").textContent=lvl; $("#sStreak").textContent=S.streak;
+  let routes=0; S.dests.forEach(d=>routes+=d.routes.length); $("#sRoutes").textContent=routes;
+}
+function bumpStreak(){
+  const today=new Date().toISOString().slice(0,10);
+  if(S.lastTravel===today)return;
+  if(S.lastTravel){ const diff=(new Date(today)-new Date(S.lastTravel))/86400000;
+    S.streak = diff===1 ? S.streak+1 : 1; } else S.streak=1;
+  S.lastTravel=today; save(); updateHUD();
+}
+
+/* ---------- time trials ---------- */
+let ttSel=null, ttRun=null, ttStartTs=0;
+function renderTT(){
+  const c=$("#ttRoutes"); const all=[];
+  S.dests.forEach((d,i)=>d.routes.forEach(r=>all.push({d,r,i})));
+  if(!all.length){ c.innerHTML=`<div class="empty"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><p>Record a route first, then time yourself doing it.</p></div>`; return; }
+  c.innerHTML="";
+  all.forEach(({d,r,i})=>{ const el=document.createElement("div"); el.className="tt-route"+(ttSel&&ttSel.r.id===r.id?" sel":"");
+    el.innerHTML=`<div class="pin" style="width:26px;height:26px;border-radius:7px;background:var(--ink-3);border:1px solid var(--line);display:grid;place-items:center;font-size:13px">${pinFor(i)}</div>
+      <div class="body"><h4>${esc(d.name)} · ${esc(r.name)}</h4><div class="best ${r.bestMs?'':'none'}">${r.bestMs?'Best '+fmtMs(r.bestMs):'No time yet'} · ${(r.dist/1000).toFixed(2)} km</div></div>`;
+    el.onclick=()=>{ ttSel={d,r}; renderTT(); map.flyTo([d.lat,d.lng],15);
+      layers.flash.clearLayers(); L.polyline(r.coords.map(c=>[c[0],c[1]]),{color:"#34d6c2",weight:6,opacity:.9}).addTo(layers.flash); };
+    c.appendChild(el);
+  });
+}
+function fmtMs(ms){ const t=ms/1000; const m=Math.floor(t/60); const s=(t%60).toFixed(1); return `${m}:${s.padStart(4,"0")}`; }
+$("#ttStart").onclick=()=>{ if(!ttSel)return toast("Pick a route to time","coral");
+  ttStartTs=Date.now(); $("#ttStart").disabled=true; $("#ttStop").disabled=false;
+  ttRun=setInterval(()=>{ $("#ttClock").textContent=fmtMs(Date.now()-ttStartTs); },100); toast("Timer running","Go!"); };
+$("#ttStop").onclick=()=>{
+  if(!ttRun)return; clearInterval(ttRun); ttRun=null; $("#ttStart").disabled=false; $("#ttStop").disabled=true;
+  const ms=Date.now()-ttStartTs; $("#ttClock").textContent=fmtMs(ms);
+  const r=ttSel.r; bumpStreak();
+  if(!r.bestMs || ms<r.bestMs){ const improved=!!r.bestMs; r.bestMs=ms; save();
+    award(improved?40:25, improved?"New best time! 🏆":"First time logged"); }
+  else { award(10,"Trip logged ("+fmtMs(ms)+")"); }
+  renderTT();
+};
+
+/* ---------- landmarks ---------- */
+let lmMode=false;
+$("#addLmBtn").onclick=()=>{ lmMode=true; closeDeck(); toast("Tap a landmark on the map","A sign, shop, or spot you'll recognize"); };
+async function addLandmark(lat,lng){
+  lmMode=false;
+  prompt2("Name this landmark","What is it? (e.g. 'red bridge', 'corner bakery')","",async name=>{
+    if(!name)return;
+    const lm={id:uid(),name,lat,lng,photo:null};
+    S.landmarks.push(lm); S.quizItems["lm:"+lm.id]={seen:0,correct:0}; save(); renderLm(); drawAll();
+    toast("Landmark pinned ⭐","","teal");
+    if(S.settings.token){ const url=await mapillaryNear(lat,lng); if(url){ lm.photo=url; save(); renderLm(); toast("Street photo attached 📸","","teal"); } }
+  });
+}
+async function mapillaryNear(lat,lng){
+  if(!S.settings.token)return null;
+  const d=0.0004;
+  const bbox=`${lng-d},${lat-d},${lng+d},${lat+d}`;
+  try{
+    const url=`https://graph.mapillary.com/images?access_token=${encodeURIComponent(S.settings.token)}&fields=id,thumb_1024_url&bbox=${bbox}&limit=1`;
+    const r=await fetch(url); const data=await r.json();
+    if(data.data && data.data.length) return data.data[0].thumb_1024_url;
+  }catch(e){}
+  return null;
+}
+function renderLm(){
+  const c=$("#lmList");
+  if(!S.landmarks.length){ c.innerHTML=""; return; }
+  c.innerHTML="";
+  S.landmarks.forEach(l=>{ const el=document.createElement("div"); el.className="card"; el.style.padding="10px";
+    el.innerHTML=`<div class="dest"><div class="pin">⭐</div><div class="body"><h3>${esc(l.name)}</h3>
+      <div class="meta">${l.photo?'📸 photo attached':'no photo'}</div></div>
+      <button class="btn sm danger" data-dl="${l.id}" style="align-self:center">✕</button></div>`;
+    c.appendChild(el);
+  });
+  c.querySelectorAll("[data-dl]").forEach(b=>b.onclick=()=>{ S.landmarks=S.landmarks.filter(x=>x.id!==b.dataset.dl); delete S.quizItems["lm:"+b.dataset.dl]; save(); renderLm(); drawAll(); });
+}
+
+/* ---------- quiz ---------- */
+let quiz=null;
+$("#quizStart").onclick=buildQuiz;
+function buildQuiz(){
+  const pool=[];
+  // street questions
+  Object.keys(S.quizItems).forEach(k=>{
+    if(k.startsWith("street:")){ const it=S.quizItems[k]; const name=k.slice(7);
+      pool.push({type:"street",key:k,answer:name,lat:it.lat,lng:it.lng,weight:weight(it)}); }
+  });
+  // landmark questions
+  S.landmarks.forEach(l=>{ const it=S.quizItems["lm:"+l.id]||{seen:0,correct:0};
+    pool.push({type:"lm",key:"lm:"+l.id,answer:l.name,lat:l.lat,lng:l.lng,photo:l.photo,weight:weight(it)}); });
+  if(pool.length<2){ $("#quizArea").innerHTML=`<div class="empty"><p>Record a route or pin a couple of landmarks first — then there's something to quiz on.</p></div>`; return; }
+  const streetNames=pool.filter(p=>p.type==="street").map(p=>p.answer);
+  const lmNames=pool.filter(p=>p.type==="lm").map(p=>p.answer);
+  // weighted shuffle, take up to 8
+  const ordered=weightedPick(pool, Math.min(8,pool.length));
+  quiz={items:ordered,idx:0,right:0,streetNames,lmNames};
+  nextQ();
+}
+function weight(it){ const acc=it.seen?it.correct/it.seen:0; return 1 + (it.seen===0?1.5:0) + (1-acc)*2.5; }
+function weightedPick(pool,n){
+  const arr=pool.slice(); const out=[];
+  for(let i=0;i<n && arr.length;i++){
+    const tot=arr.reduce((s,p)=>s+p.weight,0); let r=Math.random()*tot,j=0;
+    while(r>arr[j].weight){ r-=arr[j].weight; j++; } out.push(arr.splice(j,1)[0]);
+  } return out;
+}
+function nextQ(){
+  if(quiz.idx>=quiz.items.length){ return endQuiz(); }
+  const q=quiz.items[quiz.idx];
+  const distractPool=(q.type==="street"?quiz.streetNames:quiz.lmNames).filter(n=>n!==q.answer);
+  shuffle(distractPool);
+  const opts=[q.answer,...distractPool.slice(0,3)]; shuffle(opts);
+  const area=$("#quizArea");
+  let media;
+  if(q.photo){ media=`<img class="quiz-img" src="${q.photo}" alt="">`; }
+  else { media=`<div class="quiz-imgph">📍 Look at the map — it's centered on this spot.<br><small>(Add a Mapillary token for street photos)</small></div>`; }
+  area.innerHTML=`<div class="quiz-stage">
+    <div class="quiz-progress"><span>Q ${quiz.idx+1} / ${quiz.items.length}</span><span>${quiz.right} correct</span></div>
+    ${media}
+    <div class="quiz-q">${q.type==="street"?"Which <b>street</b> is this?":"What <b>landmark</b> is this?"}</div>
+    <div class="quiz-opts" id="qOpts"></div></div>`;
+  const oc=$("#qOpts");
+  opts.forEach(o=>{ const b=document.createElement("button"); b.className="quiz-opt"; b.textContent=o;
+    b.onclick=()=>answer(q,o,b); oc.appendChild(b); });
+  // focus map on the spot
+  if(q.lat&&q.lng){ map.flyTo([q.lat,q.lng],17); layers.flash.clearLayers();
+    L.marker([q.lat,q.lng],{icon:mIcon("❓")}).addTo(layers.flash); }
+}
+function answer(q,choice,btn){
+  const it=S.quizItems[q.key]||{seen:0,correct:0}; it.seen++; 
+  const correct=choice===q.answer;
+  $$("#qOpts .quiz-opt").forEach(b=>{ b.disabled=true;
+    if(b.textContent===q.answer)b.classList.add("correct");
+    else if(b===btn)b.classList.add("wrong"); });
+  if(correct){ it.correct++; quiz.right++; }
+  S.quizItems[q.key]=it; save();
+  setTimeout(()=>{ quiz.idx++; nextQ(); },correct?700:1300);
+}
+function endQuiz(){
+  const total=quiz.items.length, r=quiz.right;
+  const pts=r*8 + (r===total?15:0);
+  if(pts>0)award(pts, r===total?"Perfect drill! 🎯":`${r}/${total} correct`);
+  $("#quizArea").innerHTML=`<div class="empty"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-9"/></svg>
+    <p style="font-size:16px;color:var(--paper);font-weight:700">${r} / ${total} correct</p>
+    <p>+${pts} points</p></div>`;
+  layers.flash.clearLayers(); renderStats(); quiz=null;
+}
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+/* ---------- stats ---------- */
+function renderStats(){
+  let routes=0,dist=0; const streets=new Set();
+  S.dests.forEach(d=>d.routes.forEach(r=>{ routes++; dist+=r.dist; r.streets.forEach(s=>streets.add(s.name)); }));
+  $("#stRoutes").textContent=routes; $("#stStreets").textContent=streets.size; $("#stKm").textContent=(dist/1000).toFixed(1);
+  let seen=0,corr=0; Object.values(S.quizItems).forEach(it=>{ seen+=it.seen||0; corr+=it.correct||0; });
+  $("#stAcc").textContent=seen?Math.round(corr/seen*100)+"%":"—";
+
+  // coverage by destination (routes vs a target of 3)
+  const cov=$("#coverList");
+  if(!S.dests.length){ cov.innerHTML=`<p class="hint">Add places to see coverage.</p>`; }
+  else{ cov.innerHTML=""; S.dests.forEach(d=>{ const n=d.routes.length, pct=Math.min(100,n/3*100);
+    const el=document.createElement("div"); el.className="bar";
+    el.innerHTML=`<div class="bl"><span>${esc(d.name)}</span><span>${n}/3 routes</span></div><div class="track"><div class="fill" style="width:${pct}%"></div></div>`;
+    cov.appendChild(el); }); }
+
+  // toughest streets (lowest accuracy, seen>0)
+  const weak=$("#weakList");
+  const arr=Object.keys(S.quizItems).filter(k=>k.startsWith("street:")&&S.quizItems[k].seen>0)
+    .map(k=>({name:k.slice(7),acc:S.quizItems[k].correct/S.quizItems[k].seen,seen:S.quizItems[k].seen}))
+    .sort((a,b)=>a.acc-b.acc).slice(0,5);
+  if(!arr.length){ weak.innerHTML=`<p class="hint">Run a memory drill to find your weak spots.</p>`; }
+  else{ weak.innerHTML=""; arr.forEach(s=>{ const el=document.createElement("div"); el.className="bar";
+    el.innerHTML=`<div class="bl"><span>${esc(s.name)}</span><span>${Math.round(s.acc*100)}%</span></div><div class="track"><div class="fill teal" style="width:${s.acc*100}%"></div></div>`;
+    weak.appendChild(el); }); }
+}
+
+/* ---------- map clicks ---------- */
+map.on("click",e=>{
+  if(recording){ recAddPoint(e.latlng.lat,e.latlng.lng); return; }
+  if(lmMode){ addLandmark(e.latlng.lat,e.latlng.lng); return; }
+});
+map.on("contextmenu",e=>{ if(recording||lmMode)return;
+  prompt2("Add a place here","Name this spot","",n=>{ if(n)addDest(e.latlng.lat,e.latlng.lng,n); }); });
+
+/* ---------- tabs / deck ---------- */
+function switchTab(t){
+  $$(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));
+  $$(".panel").forEach(p=>p.classList.toggle("on",p.id==="p-"+t));
+  if(t==="travel")renderTT(); if(t==="stats")renderStats(); if(t==="learn")renderLm();
+}
+$$(".tabs button").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+$("#menuBtn").onclick=()=>$("#deck").classList.toggle("open");
+function closeDeck(){ $("#deck").classList.remove("open"); }
+
+/* ---------- map tools ---------- */
+$("#tileBtn").onclick=()=>$("#tilePop").classList.toggle("on");
+(function(){ const p=$("#tilePop"); Object.keys(TILES).forEach(k=>{ const b=document.createElement("button");
+  b.dataset.t=k; b.textContent=TILES[k].name; b.onclick=()=>{ setTile(k); p.classList.remove("on"); }; p.appendChild(b); }); })();
+
+/* ---------- setup ---------- */
+$("#mlyToken").value=S.settings.token||"";
+$("#mlyDot").classList.toggle("ok",!!S.settings.token);
+$("#saveTokenBtn").onclick=()=>{ S.settings.token=$("#mlyToken").value.trim(); save();
+  $("#mlyDot").classList.toggle("ok",!!S.settings.token); toast(S.settings.token?"Token saved 📸":"Token cleared","","teal"); };
+function syncRouting(){ $("#routingState").textContent=S.settings.routing?"On":"Off"; }
+$("#routingToggle").onclick=()=>{ S.settings.routing=!S.settings.routing; save(); syncRouting(); };
+syncRouting();
+
+$("#exportBtn").onclick=()=>{ const blob=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="wayfinder-backup.json"; a.click(); toast("Exported backup","","teal"); };
+$("#importBtn").onclick=()=>$("#importFile").click();
+$("#importFile").onchange=e=>{ const f=e.target.files[0]; if(!f)return; const rd=new FileReader();
+  rd.onload=()=>{ try{ const d=JSON.parse(rd.result); S=Object.assign(JSON.parse(JSON.stringify(blank)),d); save();
+    boot(); toast("Imported ✓","","teal"); }catch(err){ toast("Bad file","coral"); } }; rd.readAsText(f); };
+$("#resetBtn").onclick=()=>prompt2("Reset everything","Type RESET to erase all data permanently.","",v=>{
+  if(v==="RESET"){ S=JSON.parse(JSON.stringify(blank)); save(); boot(); toast("Everything reset"); } });
+
+/* ---------- keyboard ---------- */
+document.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT")return;
+  if(recording){ if(e.key==="Enter")$("#rbSave").click(); if(e.key==="Escape")$("#rbCancel").click(); if(e.key==="z")$("#rbUndo").click(); }
+  if(e.key===" " && $("#p-travel").classList.contains("on")){ e.preventDefault(); (ttRun?$("#ttStop"):$("#ttStart")).click(); }
+});
+
+/* ---------- GPS / locate me ---------- */
+function showMyPos(){
+  if(!myPos)return;
+  layers.me.clearLayers();
+  if(myPos.acc) L.circle([myPos.lat,myPos.lng],{radius:Math.min(myPos.acc,120),color:"#2e9bff",fillColor:"#2e9bff",fillOpacity:.1,weight:1}).addTo(layers.me);
+  L.marker([myPos.lat,myPos.lng],{icon:meIcon,zIndexOffset:1000}).addTo(layers.me).bindTooltip("You are here");
+}
+function renderMyPosCard(){
+  const c=$("#myPosCard"); if(!myPos){ c.innerHTML=""; return; }
+  c.innerHTML=`<div class="card" style="border-color:#2e9bff55">
+    <div style="font-size:12.5px;font-weight:700;margin-bottom:9px">📍 You are here <span style="color:var(--muted);font-weight:400">±${Math.round(myPos.acc||0)} m</span></div>
+    <div class="row">
+      <button class="btn sm primary" id="mpHome">Set home</button>
+      <button class="btn sm" id="mpPlace">Add place</button>
+      <button class="btn sm teal" id="mpLm">Pin landmark</button>
+    </div></div>`;
+  $("#mpHome").onclick=()=>setHome(myPos.lat,myPos.lng,"Home");
+  $("#mpPlace").onclick=()=>prompt2("Name this place","You're adding your current spot","",n=>{ if(n)addDest(myPos.lat,myPos.lng,n); });
+  $("#mpLm").onclick=()=>addLandmark(myPos.lat,myPos.lng);
+}
+function locateMe(then){
+  if(!navigator.geolocation){ toast("No GPS on this device","coral"); return; }
+  toast("Locating you…","Allow location if prompted");
+  navigator.geolocation.getCurrentPosition(
+    pos=>{ myPos={lat:pos.coords.latitude,lng:pos.coords.longitude,acc:pos.coords.accuracy};
+      lastPick={lat:myPos.lat,lng:myPos.lng,name:"My location"};
+      showMyPos(); renderMyPosCard(); map.flyTo([myPos.lat,myPos.lng],17);
+      toast("Found you 📍","","teal"); if(then)then(); },
+    err=>{ const m=err.code===1?"Permission denied":err.code===3?"Timed out":"Unavailable";
+      toast("Couldn't get GPS",m+" — file:// blocks GPS in Chrome; try Firefox or host the file","coral"); },
+    {enableHighAccuracy:true,timeout:12000,maximumAge:8000});
+}
+$("#locateBtn").onclick=()=>locateMe();
+$("#gpsBtn").onclick=()=>locateMe();
+$("#recenterBtn").onclick=()=>{ if(S.home)map.flyTo([S.home.lat,S.home.lng],15); else locateMe(); };
+
+/* ---------- nearby places (Overpass / OpenStreetMap) ---------- */
+const POI={restaurant:"🍽️",cafe:"☕",fast_food:"🍔",bar:"🍺",pub:"🍺",pharmacy:"💊",bank:"🏦",atm:"🏧",
+  school:"🏫",university:"🎓",hospital:"🏥",clinic:"🏥",doctors:"🩺",supermarket:"🛒",convenience:"🏪",
+  fuel:"⛽",park:"🌳",library:"📚",hotel:"🏨",museum:"🏛️",cinema:"🎬",theatre:"🎭",bakery:"🥐",
+  butcher:"🥩",clothes:"👕",hairdresser:"💈",place_of_worship:"⛪",post_office:"📮",police:"🚓",
+  fire_station:"🚒",gym:"🏋️",fitness_centre:"🏋️",playground:"🛝",florist:"💐",hardware:"🔧",
+  electronics:"🔌",books:"📕",doityourself:"🪛",car_repair:"🔧",veterinary:"🐾",dentist:"🦷"};
+const poiEmoji=t=>POI[t]||"📌";
+$("#nearBtn").onclick=()=>{ const ref=myPos||{lat:map.getCenter().lat,lng:map.getCenter().lng};
+  nearbyPlaces(ref, !!myPos); };
+async function nearbyPlaces(ref,fromGps){
+  const list=$("#nearList");
+  list.innerHTML=`<p class="hint">Searching ${fromGps?"around you":"near the map center"}…</p>`;
+  const q=`[out:json][timeout:20];(node["name"]["amenity"](around:450,${ref.lat},${ref.lng});node["name"]["shop"](around:450,${ref.lat},${ref.lng});node["name"]["tourism"](around:450,${ref.lat},${ref.lng});node["name"]["leisure"](around:450,${ref.lat},${ref.lng}););out body 60;`;
+  try{
+    const r=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:"data="+encodeURIComponent(q)});
+    const data=await r.json();
+    let items=(data.elements||[]).filter(e=>e.tags&&e.tags.name&&e.lat).map(e=>({
+      name:e.tags.name, lat:e.lat, lng:e.lon,
+      type:e.tags.amenity||e.tags.shop||e.tags.tourism||e.tags.leisure,
+      dist:haversine([ref.lat,ref.lng],[e.lat,e.lon])
+    }));
+    // dedupe by name+rough location, sort by distance
+    const seen=new Set(); items=items.filter(i=>{ const k=i.name+Math.round(i.lat*1e4); if(seen.has(k))return false; seen.add(k); return true; });
+    items.sort((a,b)=>a.dist-b.dist); items=items.slice(0,25);
+    renderNearby(items,fromGps);
+  }catch(e){ list.innerHTML=`<p class="hint" style="color:var(--coral)">Couldn't load nearby places. Overpass may be busy — try again in a moment.</p>`; }
+}
+function renderNearby(items,fromGps){
+  const list=$("#nearList");
+  if(!items.length){ list.innerHTML=`<p class="hint">No named places found ${fromGps?"near you":"near the map center"}. Pan the map and try again.</p>`; return; }
+  list.innerHTML=`<p class="hint" style="margin-bottom:8px">${items.length} places ${fromGps?"around you":"near the map center"} — tap to add as a destination.</p>`;
+  items.forEach(p=>{
+    const el=document.createElement("div"); el.className="near-row";
+    el.innerHTML=`<div class="ni">${poiEmoji(p.type)}</div><div class="nb"><h4>${esc(p.name)}</h4>
+      <div class="nm">${esc((p.type||"place").replace(/_/g," "))} · ${Math.round(p.dist)} m</div></div><div class="nadd">+</div>`;
+    el.onclick=()=>{ addDest(p.lat,p.lng,p.name); el.style.opacity=".4"; el.style.pointerEvents="none"; };
+    el.addEventListener("mouseenter",()=>{ layers.flash.clearLayers(); L.marker([p.lat,p.lng],{icon:mIcon("📍")}).addTo(layers.flash); });
+    list.appendChild(el);
+  });
+}
+
+/* ---------- boot ---------- */
+function boot(){
+  setTile(S.settings.tile||"voyager");
+  renderHome(); renderDests(); renderLm(); renderTT(); renderStats(); updateHUD();
+  $("#mlyToken").value=S.settings.token||""; $("#mlyDot").classList.toggle("ok",!!S.settings.token); syncRouting();
+  drawAll();
+  if(S.home) map.setView([S.home.lat,S.home.lng],14);
+  // first run: leave default view; user can tap "Locate me" (avoids an unexpected GPS prompt)
+}
+boot();
+map.on("locationerror",()=>{});
+} /* ---------- end startApp ---------- */
+</script>
+</body>
+</html>
