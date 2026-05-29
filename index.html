@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lab Notebook</title>
+<meta name="description" content="Read and write SOPs and personal lab notebooks from any device. Mobile-friendly.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0f172a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lab Notebook">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Lab Notebook">
+<meta property="og:description" content="Read and write SOPs and personal lab notebooks from any device.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20100%20100%27%3E%3Ctext%20y%3D%27.9em%27%20font-size%3D%2790%27%3E%F0%9F%93%93%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%20100%20100%27%3E%3Ctext%20y%3D%27.9em%27%20font-size%3D%2790%27%3E%F0%9F%93%93%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%20%22Lab%20Notebook%22%2C%20%22short_name%22%3A%20%22Notebook%22%2C%20%22start_url%22%3A%20%22.%22%2C%20%22scope%22%3A%20%22.%22%2C%20%22display%22%3A%20%22standalone%22%2C%20%22background_color%22%3A%20%22%230f172a%22%2C%20%22theme_color%22%3A%20%22%230f172a%22%2C%20%22icons%22%3A%20%5B%7B%22src%22%3A%20%22data%3Aimage/svg%2Bxml%2C%253Csvg%2520xmlns%253D%2527http%253A//www.w3.org/2000/svg%2527%2520viewBox%253D%25270%25200%2520100%2520100%2527%253E%253Ctext%2520y%253D%2527.9em%2527%2520font-size%253D%252790%2527%253E%25F0%259F%2593%2593%253C/text%253E%253C/svg%253E%22%2C%20%22sizes%22%3A%20%22any%22%2C%20%22type%22%3A%20%22image/svg%2Bxml%22%2C%20%22purpose%22%3A%20%22any%22%7D%5D%7D">
+<style>
+  :root {
+    --bg:#0f172a; --panel:#1e293b; --panel-2:#334155;
+    --text:#e2e8f0; --muted:#94a3b8; --accent:#60a5fa;
+    --accent-strong:#2563eb; --green:#22c55e; --red:#ef4444;
+    --border:rgba(255,255,255,0.08);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; height:100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: contain;
+  }
+  /* Setup card */
+  #setup {
+    padding: 20px;
+    max-width: 480px;
+    margin: 24px auto;
+  }
+  #setup h1 { font-size: 22px; margin: 0 0 16px; }
+  #setup p.hint { color: var(--muted); font-size: 13px; line-height: 1.5; margin-bottom: 18px; }
+  .field { margin-bottom: 14px; }
+  .field label { display:block; font-size:11px; text-transform:uppercase; color: var(--muted); letter-spacing:0.5px; margin-bottom:4px; }
+  .field input {
+    width:100%; padding: 12px; border-radius: 8px;
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); font-size: 15px;
+  }
+  .field input:focus { outline: 2px solid var(--accent); }
+  button.primary {
+    width:100%; padding: 14px;
+    background: var(--accent-strong); color:#fff;
+    border:none; border-radius: 8px;
+    font-size: 15px; font-weight: bold;
+    cursor: pointer; margin-top: 4px;
+  }
+  button.primary:active { transform: translateY(1px); }
+  button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  
+  /* Status bar */
+  #status {
+    padding: 10px 14px; font-size: 12px;
+    background: var(--panel); color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+  }
+  #status.ok    { color: #86efac; }
+  #status.err   { color: #fca5a5; }
+  #status.busy  { color: #fde68a; }
+  
+  /* Main app */
+  #app { display:none; height:100vh; flex-direction:column; }
+  #app.active { display:flex; }
+  
+  /* Top bar */
+  .topbar {
+    display:flex; align-items:center; gap: 8px;
+    padding: 10px 12px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding-top: max(10px, env(safe-area-inset-top));
+  }
+  .topbar h2 {
+    font-size: 15px; margin: 0; flex: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .topbar .room-tag {
+    font-size: 10px; color: var(--muted);
+    padding: 2px 6px; background: var(--panel-2);
+    border-radius: 4px;
+  }
+  .icon-btn {
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border);
+    width: 36px; height: 36px; border-radius: 8px;
+    font-size: 16px; cursor: pointer;
+    display:flex; align-items:center; justify-content:center;
+    padding: 0;
+  }
+  .icon-btn:active { background: var(--accent); }
+  
+  /* Tabs */
+  .tabs {
+    display:flex; background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    flex:1; padding: 14px 8px;
+    background: transparent; color: var(--muted);
+    border: none; cursor: pointer;
+    font-size: 13px; font-weight: 600;
+    border-bottom: 3px solid transparent;
+  }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  
+  /* Document list */
+  .list-view {
+    flex:1; overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .doc-item {
+    padding: 14px 14px 12px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .doc-item:active { background: var(--panel); }
+  .doc-title {
+    font-size: 15px; font-weight: 600;
+    margin-bottom: 4px;
+    display:flex; align-items:center; gap: 6px;
+  }
+  .doc-meta {
+    font-size: 11px; color: var(--muted);
+    display:flex; gap: 8px;
+  }
+  .doc-preview {
+    font-size: 12px; color: var(--muted);
+    margin-top: 6px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .empty {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  
+  /* Editor view */
+  .editor-view {
+    flex:1; display:flex; flex-direction:column;
+    background: var(--bg);
+  }
+  .editor-header {
+    padding: 8px 12px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display:flex; align-items:center; gap:8px;
+  }
+  .editor-title {
+    flex:1; background: transparent; color: var(--text);
+    border: none; font-size: 15px; font-weight: 600;
+    padding: 6px;
+  }
+  .editor-title:focus { outline: 1px solid var(--accent); background: var(--bg); border-radius: 4px; }
+  .editor-meta {
+    padding: 6px 12px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px; color: var(--muted);
+    display:flex; gap: 10px; align-items:center;
+  }
+  .pages-nav {
+    padding: 6px 12px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display:flex; gap: 6px; align-items:center;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .page-tab {
+    flex-shrink: 0;
+    padding: 6px 12px; min-width: 50px;
+    background: var(--panel-2); color: var(--text);
+    border:1px solid var(--border); border-radius: 6px;
+    cursor: pointer; font-size: 12px;
+  }
+  .page-tab.active { background: var(--accent); color: #000; font-weight: bold; }
+  .page-tab.add { background: transparent; color: var(--green); border-color: var(--green); }
+  
+  .editor-body {
+    flex:1; padding: 12px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .editor-textarea {
+    flex:1; width: 100%;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 15px;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+    resize: none;
+    box-sizing: border-box;
+  }
+  .editor-textarea:focus { outline: 2px solid var(--accent); }
+  
+  .save-bar {
+    padding: 10px 12px;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    display:flex; gap: 8px; align-items:center;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+  .save-bar .auto-status {
+    flex:1; font-size: 12px; color: var(--muted);
+  }
+  .save-bar button {
+    padding: 10px 18px;
+    background: var(--green); color: #000;
+    border: none; border-radius: 6px;
+    font-size: 14px; font-weight: bold;
+    cursor: pointer;
+  }
+  .save-bar button:active { transform: translateY(1px); }
+  .save-bar button.danger { background: var(--red); color: #fff; }
+  
+  /* New-document FAB */
+  .fab {
+    position: fixed; bottom: 16px; right: 16px;
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: var(--accent-strong); color: #fff;
+    border: none; font-size: 28px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+    z-index: 100;
+    padding-bottom: max(0px, env(safe-area-inset-bottom));
+  }
+  .fab:active { transform: scale(0.95); }
+  
+  /* Read/write indicators */
+  .sop-badge { background: #f59e0b; color: #000; }
+  .nb-badge  { background: var(--accent); color: #000; }
+  .badge {
+    font-size: 9px; padding: 2px 5px; border-radius: 3px; font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup">
+  <h1>📓 Lab Notebook</h1>
+  <p class="hint">Read and write SOPs and your personal notebooks. Mobile-friendly. Connects to the same Firebase data as Persona City.</p>
+  <div class="field">
+    <label>Room Code</label>
+    <input id="setup-room" placeholder="Enter room code" maxlength="8" autocomplete="off" autocapitalize="characters">
+  </div>
+  <div class="field">
+    <label>Your Player Name</label>
+    <input id="setup-name" placeholder="Enter your player name" autocomplete="off">
+  </div>
+  <button class="primary" id="setup-go">Connect</button>
+  <p class="hint" style="margin-top: 20px; font-size:11px;">
+    Your room code and name are saved in this browser so you don't have to re-enter them. Use the same names as in Persona City.
+  </p>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div id="status">Connecting…</div>
+  
+  <!-- Top bar (list view) -->
+  <div class="topbar" id="topbar-list">
+    <h2 id="topbar-title">📓 Lab Notebook</h2>
+    <span class="room-tag" id="topbar-room"></span>
+    <button class="icon-btn" id="btn-refresh" title="Refresh">🔄</button>
+    <button class="icon-btn" id="btn-logout" title="Disconnect">⎋</button>
+  </div>
+  
+  <!-- Top bar (editor view) -->
+  <div class="topbar" id="topbar-editor" style="display:none;">
+    <button class="icon-btn" id="btn-back">←</button>
+    <input class="editor-title" id="editor-title" placeholder="Untitled">
+    <button class="icon-btn danger" id="btn-delete" title="Delete">🗑</button>
+  </div>
+  
+  <!-- Tabs -->
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="sops">📋 SOPs</button>
+    <button class="tab" data-tab="notebooks">📓 My Notebooks</button>
+  </div>
+  
+  <!-- SOPs list -->
+  <div class="list-view" id="view-sops">
+    <div class="empty">Loading…</div>
+  </div>
+  
+  <!-- Notebooks list -->
+  <div class="list-view" id="view-notebooks" style="display:none;">
+    <div class="empty">Loading…</div>
+  </div>
+  
+  <!-- Editor view -->
+  <div class="editor-view" id="view-editor" style="display:none;">
+    <div class="editor-meta">
+      <span id="editor-meta-type"></span>
+      <span id="editor-meta-modified" style="flex:1; text-align:right;"></span>
+    </div>
+    <div class="pages-nav" id="pages-nav" style="display:none;"></div>
+    <div class="editor-body">
+      <textarea class="editor-textarea" id="editor-text" placeholder="Start typing…" spellcheck="false"></textarea>
+    </div>
+    <div class="save-bar">
+      <span class="auto-status" id="auto-status">Unsaved</span>
+      <button id="btn-save">💾 Save</button>
+    </div>
+  </div>
+  
+  <button class="fab" id="fab-new" style="display:none;">＋</button>
+</div>
+
+<!-- Firebase v9 compat (matches Persona City) -->
+<script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
+
+<script>
+// ─── Firebase setup (matches Persona City config) ────────────────────
+const firebaseConfig = {
+    apiKey: "AIzaSyD8Yv6dG7mFKjPxBcS3qV9Wn4z6yE8Xy0Y",
+    authDomain: "persona-city-default-rtdb.firebaseapp.com",
+    databaseURL: "https://persona-city-default-rtdb.firebaseio.com",
+    projectId: "persona-city",
+    storageBucket: "persona-city.appspot.com",
+};
+// Graceful guard: if the Firebase SDK didn't load, explain why instead of crashing.
+if (typeof firebase === 'undefined') {
+    var setupEl = document.getElementById('setup');
+    if (setupEl) {
+        setupEl.innerHTML =
+            '<h1>📓 Lab Notebook</h1>' +
+            '<p class="hint" style="color:#fca5a5; line-height:1.6;">' +
+            'Couldn\'t load the Firebase SDK from <b>gstatic.com</b>, so the app can\'t start.<br><br>' +
+            'Most common causes:<br>' +
+            '• A content/ad blocker (uBlock Origin, Brave Shields, Firefox strict tracking) — allow ' +
+            '<b>www.gstatic.com</b> and <b>*.firebaseio.com</b> for this site, then reload.<br>' +
+            '• No network connection.<br>' +
+            '• You\'re viewing this inside an in-app preview/sandbox — open the real GitHub Pages URL instead.' +
+            '</p>';
+    }
+    throw new Error('Firebase SDK failed to load (gstatic blocked or unreachable).');
+}
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ─── State ───────────────────────────────────────────────────────────
+const LS = {
+    room: 'labNotebook.room',
+    name: 'labNotebook.name',
+};
+let state = {
+    room: '',
+    playerName: '',
+    sanitizedName: '',
+    tab: 'sops',           // 'sops' | 'notebooks'
+    sops: [],              // [{id, title, content, knowledgeSetId, ...}]
+    notebooks: [],         // [{idx, deskName, title, pages, lastModified}]
+    editing: null,         // {kind: 'sop'|'nb', payload, currentPage}
+    dirty: false,
+    saveDebounceTimer: null,
+};
+
+// ─── Utility ─────────────────────────────────────────────────────────
+function $(id) { return document.getElementById(id); }
+function sanitize(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '_'); }
+function setStatus(text, kind) {
+    const el = $('status');
+    el.textContent = text;
+    el.className = kind || '';
+}
+function fmtTime(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const now = new Date();
+    if (d.toDateString() === now.toDateString()) {
+        return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    }
+    return d.toLocaleDateString([], {month:'short', day:'numeric'});
+}
+function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ─── Setup flow ──────────────────────────────────────────────────────
+$('setup-room').value = localStorage.getItem(LS.room) || '';
+$('setup-name').value = localStorage.getItem(LS.name) || '';
+
+$('setup-go').addEventListener('click', () => {
+    const room = $('setup-room').value.trim().toUpperCase();
+    const name = $('setup-name').value.trim();
+    if (!room || !name) {
+        alert('Both fields are required.');
+        return;
+    }
+    localStorage.setItem(LS.room, room);
+    localStorage.setItem(LS.name, name);
+    state.room = room;
+    state.playerName = name;
+    state.sanitizedName = sanitize(name);
+    $('setup').style.display = 'none';
+    $('app').classList.add('active');
+    $('topbar-room').textContent = room;
+    boot();
+});
+
+$('btn-logout').addEventListener('click', () => {
+    if (confirm('Disconnect and clear room/name?')) {
+        localStorage.removeItem(LS.room);
+        localStorage.removeItem(LS.name);
+        location.reload();
+    }
+});
+
+// ─── Tab switching ───────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+function switchTab(t) {
+    state.tab = t;
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+    $('view-sops').style.display = (t === 'sops') ? '' : 'none';
+    $('view-notebooks').style.display = (t === 'notebooks') ? '' : 'none';
+    $('view-editor').style.display = 'none';
+    $('topbar-list').style.display = '';
+    $('topbar-editor').style.display = 'none';
+    $('fab-new').style.display = (t === 'notebooks') ? '' : 'none';
+}
+
+// ─── Boot: load both data sets ───────────────────────────────────────
+async function boot() {
+    setStatus('Loading SOPs…', 'busy');
+    await loadSops();
+    setStatus('Loading notebooks…', 'busy');
+    await loadNotebooks();
+    setStatus('✓ Ready', 'ok');
+    setTimeout(() => setStatus('', ''), 2500);
+}
+
+$('btn-refresh').addEventListener('click', boot);
+
+// ─── Load SOPs ───────────────────────────────────────────────────────
+async function loadSops() {
+    try {
+        const ref = db.ref(`rooms/${state.room}/sageKnowledge/documents`);
+        const snap = await ref.once('value');
+        const data = snap.val() || {};
+        // Firebase returns object keyed by id; convert to array
+        const docs = Object.values(data).filter(d => d && (d.title || d.content));
+        // Sort: alphabetical by title
+        docs.sort((a, b) => String(a.title || '').localeCompare(String(b.title || '')));
+        state.sops = docs;
+        renderSopsList();
+    } catch (e) {
+        console.error('[SOPs] load failed:', e);
+        state.sops = [];
+        renderSopsList(true, e.message);
+    }
+}
+
+function renderSopsList(error, errMsg) {
+    const list = $('view-sops');
+    if (error) {
+        list.innerHTML = `<div class="empty">⚠️ Failed to load SOPs:<br><span style="color:#fca5a5;">${escapeHtml(errMsg)}</span></div>`;
+        return;
+    }
+    if (state.sops.length === 0) {
+        list.innerHTML = `<div class="empty">No SOPs in this room yet.<br><span style="font-size:11px;">SOPs are managed in Persona City → Sage Knowledge.</span></div>`;
+        return;
+    }
+    list.innerHTML = state.sops.map((doc, i) => {
+        const preview = String(doc.content || '').replace(/\s+/g, ' ').slice(0, 140);
+        return `<div class="doc-item" data-kind="sop" data-idx="${i}">
+            <div class="doc-title">
+                <span class="badge sop-badge">SOP</span>
+                ${escapeHtml(doc.title || '(untitled)')}
+            </div>
+            <div class="doc-preview">${escapeHtml(preview)}</div>
+        </div>`;
+    }).join('');
+    list.querySelectorAll('.doc-item').forEach(el => {
+        el.addEventListener('click', () => openSopEditor(parseInt(el.dataset.idx, 10)));
+    });
+}
+
+// ─── Load notebooks ──────────────────────────────────────────────────
+async function loadNotebooks() {
+    try {
+        const ref = db.ref(`rooms/${state.room}/playerDeskDataByName/${state.sanitizedName}`);
+        const snap = await ref.once('value');
+        const allDesks = snap.val() || {};
+        const all = [];
+        for (const [sanitizedDeskName, entry] of Object.entries(allDesks)) {
+            const deskName = (entry && entry.deskName) || sanitizedDeskName;
+            const nbs = (entry && entry.data && entry.data.notebooks) || [];
+            nbs.forEach((nb, idx) => {
+                if (!nb) return;
+                all.push({
+                    sanitizedDeskName,
+                    deskName,
+                    idx,
+                    title: nb.title || `Notebook ${idx + 1}`,
+                    pages: Array.isArray(nb.pages) ? nb.pages : [String(nb.pages || '')],
+                    lastModified: (entry && entry.updatedAt) || 0,
+                });
+            });
+        }
+        // Sort by lastModified descending
+        all.sort((a, b) => (b.lastModified || 0) - (a.lastModified || 0));
+        state.notebooks = all;
+        renderNotebooksList();
+    } catch (e) {
+        console.error('[NB] load failed:', e);
+        state.notebooks = [];
+        renderNotebooksList(true, e.message);
+    }
+}
+
+function renderNotebooksList(error, errMsg) {
+    const list = $('view-notebooks');
+    if (error) {
+        list.innerHTML = `<div class="empty">⚠️ Failed to load notebooks:<br><span style="color:#fca5a5;">${escapeHtml(errMsg)}</span></div>`;
+        return;
+    }
+    if (state.notebooks.length === 0) {
+        list.innerHTML = `<div class="empty">No notebooks yet.<br><span style="font-size:11px;">Tap the ＋ button to create one.</span></div>`;
+        return;
+    }
+    list.innerHTML = state.notebooks.map((nb, i) => {
+        const preview = String(nb.pages[0] || '').replace(/\s+/g, ' ').slice(0, 140);
+        const pageInfo = nb.pages.length > 1 ? ` · ${nb.pages.length} pages` : '';
+        return `<div class="doc-item" data-kind="nb" data-idx="${i}">
+            <div class="doc-title">
+                <span class="badge nb-badge">NB</span>
+                ${escapeHtml(nb.title)}
+            </div>
+            <div class="doc-meta">desk: ${escapeHtml(nb.deskName)}${pageInfo} · ${fmtTime(nb.lastModified)}</div>
+            <div class="doc-preview">${escapeHtml(preview)}</div>
+        </div>`;
+    }).join('');
+    list.querySelectorAll('.doc-item').forEach(el => {
+        el.addEventListener('click', () => openNotebookEditor(parseInt(el.dataset.idx, 10)));
+    });
+}
+
+// ─── New notebook FAB ────────────────────────────────────────────────
+$('fab-new').addEventListener('click', async () => {
+    const title = prompt('New notebook title:', 'Notes');
+    if (!title) return;
+    const deskHint = prompt(
+        'Which desk should this notebook be saved under?\n' +
+        '(Notebooks in Persona City are stored per-desk. Use any name to identify it — most people use their main desk name.)',
+        'scratchpad'
+    );
+    if (!deskHint) return;
+    
+    const newNb = {
+        title: title.trim(),
+        pages: [''],
+        createdAt: Date.now(),
+        lastModified: Date.now(),
+    };
+    
+    try {
+        setStatus('Creating…', 'busy');
+        const sanDesk = sanitize(deskHint);
+        const ref = db.ref(`rooms/${state.room}/playerDeskDataByName/${state.sanitizedName}/${sanDesk}`);
+        const snap = await ref.once('value');
+        const existing = snap.val() || { deskName: deskHint, ownerName: state.playerName, data: { notebooks: [] } };
+        existing.deskName = existing.deskName || deskHint;
+        existing.ownerName = state.playerName;
+        if (!existing.data) existing.data = {};
+        if (!Array.isArray(existing.data.notebooks)) existing.data.notebooks = [];
+        existing.data.notebooks.push(newNb);
+        existing.updatedAt = firebase.database.ServerValue.TIMESTAMP;
+        await ref.set(existing);
+        setStatus('✓ Created', 'ok');
+        await loadNotebooks();
+        // Auto-open the new one (index 0 after sort by lastModified)
+        openNotebookEditor(0);
+    } catch (e) {
+        setStatus('⚠️ Create failed: ' + e.message, 'err');
+    }
+});
+
+// ─── Open editor ─────────────────────────────────────────────────────
+function openSopEditor(idx) {
+    const doc = state.sops[idx];
+    if (!doc) return;
+    state.editing = {
+        kind: 'sop',
+        sopIdx: idx,
+        payload: doc,
+        currentPage: 0,
+    };
+    state.dirty = false;
+    $('topbar-list').style.display = 'none';
+    $('topbar-editor').style.display = '';
+    $('view-sops').style.display = 'none';
+    $('view-notebooks').style.display = 'none';
+    $('view-editor').style.display = 'flex';
+    $('fab-new').style.display = 'none';
+    $('editor-title').value = doc.title || '';
+    $('editor-meta-type').innerHTML = `<span class="badge sop-badge">SOP</span>`;
+    $('editor-meta-modified').textContent = doc.lastModified ? `modified ${fmtTime(doc.lastModified)}` : '';
+    $('pages-nav').style.display = 'none';
+    $('editor-text').value = doc.content || '';
+    updateAutoStatus('');
+    // Re-add Back button event after view swap
+}
+
+function openNotebookEditor(idx) {
+    const nb = state.notebooks[idx];
+    if (!nb) return;
+    state.editing = {
+        kind: 'nb',
+        nbIdx: idx,
+        payload: nb,
+        currentPage: 0,
+    };
+    state.dirty = false;
+    $('topbar-list').style.display = 'none';
+    $('topbar-editor').style.display = '';
+    $('view-sops').style.display = 'none';
+    $('view-notebooks').style.display = 'none';
+    $('view-editor').style.display = 'flex';
+    $('fab-new').style.display = 'none';
+    $('editor-title').value = nb.title;
+    $('editor-meta-type').innerHTML = `<span class="badge nb-badge">NB</span> desk: ${escapeHtml(nb.deskName)}`;
+    $('editor-meta-modified').textContent = nb.lastModified ? `modified ${fmtTime(nb.lastModified)}` : '';
+    renderPagesNav();
+    $('editor-text').value = nb.pages[0] || '';
+    updateAutoStatus('');
+}
+
+function renderPagesNav() {
+    const nb = state.editing.payload;
+    const nav = $('pages-nav');
+    nav.style.display = '';
+    nav.innerHTML = nb.pages.map((_, i) =>
+        `<button class="page-tab ${i === state.editing.currentPage ? 'active' : ''}" data-page="${i}">${i + 1}</button>`
+    ).join('') + `<button class="page-tab add" data-action="add-page">+ Page</button>`;
+    nav.querySelectorAll('.page-tab').forEach(btn => {
+        if (btn.dataset.action === 'add-page') {
+            btn.addEventListener('click', addPage);
+        } else {
+            btn.addEventListener('click', () => switchPage(parseInt(btn.dataset.page, 10)));
+        }
+    });
+}
+
+function switchPage(p) {
+    // Save current page to memory first
+    state.editing.payload.pages[state.editing.currentPage] = $('editor-text').value;
+    state.editing.currentPage = p;
+    $('editor-text').value = state.editing.payload.pages[p] || '';
+    renderPagesNav();
+}
+
+function addPage() {
+    // Save current then add blank
+    state.editing.payload.pages[state.editing.currentPage] = $('editor-text').value;
+    state.editing.payload.pages.push('');
+    state.editing.currentPage = state.editing.payload.pages.length - 1;
+    $('editor-text').value = '';
+    state.dirty = true;
+    renderPagesNav();
+    updateAutoStatus('Unsaved');
+}
+
+// ─── Back ────────────────────────────────────────────────────────────
+$('btn-back').addEventListener('click', () => {
+    if (state.dirty) {
+        if (!confirm('You have unsaved changes. Leave anyway?')) return;
+    }
+    state.editing = null;
+    state.dirty = false;
+    $('topbar-list').style.display = '';
+    $('topbar-editor').style.display = 'none';
+    $('view-editor').style.display = 'none';
+    if (state.tab === 'sops') {
+        $('view-sops').style.display = '';
+    } else {
+        $('view-notebooks').style.display = '';
+        $('fab-new').style.display = '';
+    }
+});
+
+// ─── Edit detection ──────────────────────────────────────────────────
+$('editor-title').addEventListener('input', () => {
+    state.dirty = true;
+    updateAutoStatus('Unsaved');
+    debouncedAutoSave();
+});
+$('editor-text').addEventListener('input', () => {
+    state.dirty = true;
+    updateAutoStatus('Unsaved');
+    debouncedAutoSave();
+});
+
+function updateAutoStatus(text) {
+    $('auto-status').textContent = text;
+}
+function debouncedAutoSave() {
+    if (state.saveDebounceTimer) clearTimeout(state.saveDebounceTimer);
+    state.saveDebounceTimer = setTimeout(() => {
+        save(true);
+    }, 2500);
+}
+
+// ─── Save ────────────────────────────────────────────────────────────
+$('btn-save').addEventListener('click', () => save(false));
+
+async function save(isAuto) {
+    if (!state.editing) return;
+    if (state.saveDebounceTimer) {
+        clearTimeout(state.saveDebounceTimer);
+        state.saveDebounceTimer = null;
+    }
+    const { kind } = state.editing;
+    updateAutoStatus(isAuto ? 'Auto-saving…' : 'Saving…');
+    try {
+        if (kind === 'sop') {
+            await saveSop();
+        } else {
+            await saveNotebook();
+        }
+        state.dirty = false;
+        updateAutoStatus('✓ Saved ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
+    } catch (e) {
+        console.error('Save failed:', e);
+        updateAutoStatus('⚠️ Save failed: ' + e.message);
+    }
+}
+
+async function saveSop() {
+    const doc = state.editing.payload;
+    doc.title = $('editor-title').value.trim() || '(untitled)';
+    doc.content = $('editor-text').value;
+    doc.lastModified = Date.now();
+    if (!doc.id) doc.id = 'sop_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    const ref = db.ref(`rooms/${state.room}/sageKnowledge/documents/${doc.id}`);
+    await ref.set(doc);
+    // Update local
+    state.sops[state.editing.sopIdx] = doc;
+    renderSopsList();
+}
+
+async function saveNotebook() {
+    const nb = state.editing.payload;
+    nb.title = $('editor-title').value.trim() || `Notebook`;
+    // Sync current page from textarea
+    nb.pages[state.editing.currentPage] = $('editor-text').value;
+    nb.lastModified = Date.now();
+    
+    const sanDesk = nb.sanitizedDeskName;
+    const ref = db.ref(`rooms/${state.room}/playerDeskDataByName/${state.sanitizedName}/${sanDesk}`);
+    const snap = await ref.once('value');
+    const entry = snap.val() || { deskName: nb.deskName, ownerName: state.playerName, data: { notebooks: [] } };
+    if (!entry.data) entry.data = {};
+    if (!Array.isArray(entry.data.notebooks)) entry.data.notebooks = [];
+    // Update or insert at the original index
+    entry.data.notebooks[nb.idx] = {
+        title: nb.title,
+        pages: nb.pages,
+        lastModified: nb.lastModified,
+        createdAt: entry.data.notebooks[nb.idx]?.createdAt || Date.now(),
+    };
+    entry.updatedAt = firebase.database.ServerValue.TIMESTAMP;
+    await ref.set(entry);
+    state.notebooks[state.editing.nbIdx] = nb;
+    renderNotebooksList();
+}
+
+// ─── Delete ──────────────────────────────────────────────────────────
+$('btn-delete').addEventListener('click', async () => {
+    if (!state.editing) return;
+    const { kind } = state.editing;
+    const label = kind === 'sop' ? 'SOP' : 'notebook';
+    const title = $('editor-title').value || '(untitled)';
+    if (!confirm(`Delete this ${label}?\n\n"${title}"\n\nThis cannot be undone.`)) return;
+    updateAutoStatus('Deleting…');
+    try {
+        if (kind === 'sop') {
+            const doc = state.editing.payload;
+            if (doc.id) {
+                await db.ref(`rooms/${state.room}/sageKnowledge/documents/${doc.id}`).remove();
+            }
+            await loadSops();
+        } else {
+            const nb = state.editing.payload;
+            const sanDesk = nb.sanitizedDeskName;
+            const ref = db.ref(`rooms/${state.room}/playerDeskDataByName/${state.sanitizedName}/${sanDesk}`);
+            const snap = await ref.once('value');
+            const entry = snap.val();
+            if (entry && entry.data && Array.isArray(entry.data.notebooks)) {
+                entry.data.notebooks.splice(nb.idx, 1);
+                entry.updatedAt = firebase.database.ServerValue.TIMESTAMP;
+                await ref.set(entry);
+            }
+            await loadNotebooks();
+        }
+        $('btn-back').click();
+        setStatus('✓ Deleted', 'ok');
+        setTimeout(() => setStatus('', ''), 2000);
+    } catch (e) {
+        updateAutoStatus('⚠️ Delete failed: ' + e.message);
+    }
+});
+
+// Warn on accidental tab close with unsaved changes
+window.addEventListener('beforeunload', (e) => {
+    if (state.dirty) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+});
+
+// Auto-restore if previously connected
+if ($('setup-room').value && $('setup-name').value) {
+    // Don't auto-connect, just pre-fill — give user a chance to switch
+}
+</script>
+
+</body>
+</html>
